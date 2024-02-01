@@ -26,6 +26,9 @@ class TrainVQGAN:
 
         self.train_dataset, self.test_dataset = load_data(args)
         self.best_loss = 100;
+        self.start_epoch = 0;
+        if args.resume:
+            self.load_model_to_resume();
 
     def configure_optimizers(self):
         lr = self.args.learning_rate
@@ -56,13 +59,34 @@ class TrainVQGAN:
         self.discriminator.eval();
     
     def train(self):
-        for epoch in range(self.args.epochs):
+        for epoch in range(self.start_epoch, self.args.epochs):
             self.train_step(epoch);
             valid_loss = self.valid_step(epoch);
             if valid_loss < self.best_loss:
+                self.best_loss = valid_loss;
                 print('new best model found!');
                 torch.save(self.vqgan.state_dict(), os.path.join("checkpoints", f"vqgan_epoch.pt"))
+            self.save_models_to_resume(epoch);
     
+    def save_models_to_resume(self, epoch):
+        ckpt = {
+            'vqgan': self.vqgan.state_dict(),
+            'discriminator': self.discriminator.state_dict(),
+            'lpips': self.perceptual_loss.state_dict(),
+            'opt_disc': self.opt_disc.state_dict(),
+            'opt_vq' : self.opt_vq.state_dict(),
+            'epoch' : epoch+1
+        }
+        #torch.save(ckpt, 'resume.pt');
+    def load_model_to_resume(self):
+        ckpt = torch.load('resume.pt', map_location=args.device);
+        self.vqgan.load_state_dict(ckpt['vqgan']);
+        self.discriminator.load_state_dict(ckpt['discriminator']);
+        self.perceptual_loss.load_state_dict(ckpt['lpips']);
+        self.opt_disc.load_state_dict(ckpt['opt_disc']);
+        self.opt_vq.load_state_dict(ckpt['opt_vq']);
+        self.start_epoch = (ckpt['epoch']);
+
     def valid_step(self, epoch):
         self.set_to_eval();
         total_loss = [];
@@ -155,8 +179,8 @@ if __name__ == '__main__':
     #cache_dataset('C:\\PhD\\Thesis\\MRI Project\\SSLMRI\\miccai-processed')
     parser = argparse.ArgumentParser(description="VQGAN")
     parser.add_argument('--latent-dim', type=int, default=256, help='Latent dimension n_z (default: 256)')
-    parser.add_argument('--image-size', type=int, default=512, help='Image height and width (default: 256)')
-    parser.add_argument('--num-codebook-vectors', type=int, default=2048, help='Number of codebook vectors (default: 256)')
+    parser.add_argument('--image-size', type=int, default=256, help='Image height and width (default: 256)')
+    parser.add_argument('--num-codebook-vectors', type=int, default=1024, help='Number of codebook vectors (default: 256)')
     parser.add_argument('--beta', type=float, default=0.25, help='Commitment loss scalar (default: 0.25)')
     parser.add_argument('--image-channels', type=int, default=3, help='Number of channels of images (default: 3)')
     parser.add_argument('--dataset-path', type=str, default='cache', help='Path to data (default: cache)')
@@ -171,9 +195,10 @@ if __name__ == '__main__':
     parser.add_argument('--rec-loss-factor', type=float, default=1., help='Weighting factor for reconstruction loss.')
     parser.add_argument('--perceptual-loss-factor', type=float, default=1., help='Weighting factor for perceptual loss.')
     parser.add_argument('--num-workers', type=float, default=0, help='Data loader num workers.')
+    parser.add_argument('--resume', type=float, default=False, help='indicate wether to resume training or start from the beginning.')
+    parser.add_argument('--baby-dataset', type=float, default=False, help='for debugging purposes, indicate if use only 5 samples for training.')
 
     args = parser.parse_args()
-    #args.dataset_path = r"cache"
 
     train_vqgan = TrainVQGAN(args)
     train_vqgan.train();

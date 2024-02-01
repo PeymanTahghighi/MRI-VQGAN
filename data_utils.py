@@ -103,8 +103,8 @@ def load_data(args):
     total_mri_samples = list(glob(f'{args.dataset_path}/*'));
     total_mri_samples = shuffle(total_mri_samples, random_state = 42);
     train_set, test_set = total_mri_samples[:int(len(total_mri_samples)*0.8)], total_mri_samples[int(len(total_mri_samples)*0.8)+1:]
-    train_data = MRIDataset(train_set[:5], args);
-    test_data = MRIDataset(test_set[:5], args);
+    train_data = MRIDataset(train_set[:5] if args.baby_dataset else train_set, args);
+    test_data = MRIDataset(test_set[:5] if args.baby_dataset else test_set, args);
     train_loader = DataLoader(train_data, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=True, pin_memory=True)
     test_loader = DataLoader(test_data, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=True, pin_memory=True)
     return train_loader, test_loader
